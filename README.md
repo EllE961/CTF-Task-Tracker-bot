@@ -155,6 +155,8 @@ Once started, the bot will automatically:
 | `/challenge_delete id:<int>`               | Manage Messages | Remove a challenge from board and GitHub         |
 | `/update_repo_view`                        | Everyone        | Manually update the repository structure display  |
 | `/show_repo_structure`                     | Everyone        | Show the repository structure in the current channel |
+| `/debug`                                   | Everyone        | Show comprehensive system status and network info |
+| `/give_treat`                              | Everyone        | Give the bot a treat (just for fun)               |
 | `/help`                                    | Everyone        | Show command reference and workflow              |
 
 #### Multi-Challenge Format
@@ -294,6 +296,33 @@ Example view:
 │       └── ...
 └── 📄 README.md
 ```
+
+## Debug & Utility Features
+
+The bot includes several utility and debug features to help with monitoring and team engagement:
+
+### Debug Command
+
+The `/debug` command provides comprehensive system information:
+
+- **Bot Status**: Name, uptime, latency, CTF status, and connections
+- **System Information**: OS details, Python version, memory usage
+- **Database**: Path, size, task count, and query statistics
+- **Network**: Hostname, ping, and processing times
+
+This command is helpful for:
+- Checking if the bot is functioning properly
+- Monitoring performance and resource usage
+- Troubleshooting connectivity issues
+- Verifying database and task status
+
+### Fun Features
+
+The bot includes some fun features to boost team morale:
+
+- **Give Treat**: The `/give_treat` command lets you give the bot a virtual treat
+- The bot responds with different food emojis and cheerful messages
+- This fun interaction helps build team spirit during CTF competitions
 
 ## Troubleshooting
 

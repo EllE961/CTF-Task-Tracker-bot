@@ -498,6 +498,18 @@ class CTFCommands(commands.Cog):
             inline=False
         )
         
+        # Add Repository and Utility commands section
+        embed.add_field(
+            name="📂 Repository & Utility Commands",
+            value=(
+                "`/update_repo_view` - Manually update the repository structure display\n"
+                "`/show_repo_structure` - Show the repository structure in current channel\n"
+                "`/debug` - Show comprehensive bot and system information\n"
+                "`/give_treat` - Give the bot a treat (just for fun)"
+            ),
+            inline=False
+        )
+        
         # Add Workflow section
         embed.add_field(
             name="💡 Typical Workflow",
