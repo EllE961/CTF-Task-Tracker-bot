@@ -151,13 +151,21 @@ class CTFCommands(commands.Cog):
         # Get active CTF
         ctf_name, ctf_year = await db.get_active_ctf()
         if not ctf_name or not ctf_year:
-            await interaction.response.send_message(
-                "⚠️ No active CTF to mark as done.",
-                ephemeral=True
-            )
+            try:
+                await interaction.response.send_message(
+                    "⚠️ No active CTF to mark as done.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired for ctf_done command - no active CTF")
             return
         
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Try to defer, but catch NotFound errors
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except discord.errors.NotFound:
+            logger.warning("Interaction expired when deferring ctf_done command")
+            return
         
         try:
             # Clear the active CTF
@@ -169,18 +177,24 @@ class CTFCommands(commands.Cog):
             # Update the repo viewer
             await RepoViewerCommands.trigger_update()
             
-            await interaction.followup.send(
-                f"✅ Marked `{ctf_name}-{ctf_year}` as finished. No more challenges can be added.\n"
-                f"To start a new CTF, use `/ctf_add`",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"✅ Marked `{ctf_name}-{ctf_year}` as finished. No more challenges can be added.\n"
+                    f"To start a new CTF, use `/ctf_add`",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired when sending followup for ctf_done")
             
         except Exception as e:
             logger.error(f"Error in ctf_done: {e}")
-            await interaction.followup.send(
-                "⚠️ An error occurred while marking the CTF as done.",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "⚠️ An error occurred while marking the CTF as done.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired when sending error for ctf_done")
     
     @app_commands.command(name="ctf_publish", description="Make the repository public (only when no active CTF)")
     async def ctf_publish(self, interaction: discord.Interaction):
@@ -198,14 +212,22 @@ class CTFCommands(commands.Cog):
         # Check if there's no active CTF (safety check)
         ctf_name, ctf_year = await db.get_active_ctf()
         if ctf_name and ctf_year:
-            await interaction.response.send_message(
-                "⚠️ There is an active CTF running. For safety, you cannot publish the repository while a CTF is active.\n"
-                "Please run `/ctf_done` first to mark the CTF as finished.",
-                ephemeral=True
-            )
+            try:
+                await interaction.response.send_message(
+                    "⚠️ There is an active CTF running. For safety, you cannot publish the repository while a CTF is active.\n"
+                    "Please run `/ctf_done` first to mark the CTF as finished.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired for ctf_publish command - safety check")
             return
         
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        # Try to defer, but catch NotFound errors
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except discord.errors.NotFound:
+            logger.warning("Interaction expired when deferring ctf_publish command")
+            return
         
         try:
             # Set the repository to public
@@ -215,23 +237,32 @@ class CTFCommands(commands.Cog):
                 # Update the repo viewer
                 await RepoViewerCommands.trigger_update()
                 
-                await interaction.followup.send(
-                    "✅ Repository has been successfully made public.\n"
-                    "All CTF content is now publicly accessible.",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "✅ Repository has been successfully made public.\n"
+                        "All CTF content is now publicly accessible.",
+                        ephemeral=True
+                    )
+                except discord.errors.NotFound:
+                    logger.warning("Interaction expired when sending success message for ctf_publish")
             else:
-                await interaction.followup.send(
-                    "⚠️ Failed to make the repository public. Check the logs for details.",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "⚠️ Failed to make the repository public. Check the logs for details.",
+                        ephemeral=True
+                    )
+                except discord.errors.NotFound:
+                    logger.warning("Interaction expired when sending failure message for ctf_publish")
             
         except Exception as e:
             logger.error(f"Error in ctf_publish: {e}")
-            await interaction.followup.send(
-                "⚠️ An error occurred while publishing the repository.",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "⚠️ An error occurred while publishing the repository.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired when sending error for ctf_publish")
     
     @app_commands.command(name="ctf_clear", description="Clear claim branches for a CTF")
     @app_commands.describe(

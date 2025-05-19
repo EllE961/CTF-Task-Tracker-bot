@@ -49,17 +49,24 @@ class ChallengeCommands(commands.Cog):
         # Check if there's an active CTF
         ctf_name, ctf_year = await db.get_active_ctf()
         if not ctf_name or not ctf_year:
-            await interaction.response.send_message(
-                "⚠️ No active CTF. Use `/ctf_add` to start one first.",
-                ephemeral=True
-            )
+            try:
+                await interaction.response.send_message(
+                    "⚠️ No active CTF. Use `/ctf_add` to start one first.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning(f"Interaction expired for challenge_add - no active CTF")
             return
         
         # Clean inputs
         category = category.lower().strip()
         name = name.strip()
         
-        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+        except discord.errors.NotFound:
+            logger.warning(f"Interaction expired when deferring challenge_add")
+            return
         
         try:
             # Create the challenge scaffold in GitHub
@@ -68,10 +75,13 @@ class ChallengeCommands(commands.Cog):
             )
             
             if not scaffold_created:
-                await interaction.followup.send(
-                    "⚠️ Failed to create challenge scaffold in GitHub.",
-                    ephemeral=True
-                )
+                try:
+                    await interaction.followup.send(
+                        "⚠️ Failed to create challenge scaffold in GitHub.",
+                        ephemeral=True
+                    )
+                except discord.errors.NotFound:
+                    logger.warning("Interaction expired when sending scaffold error for challenge_add")
                 return
             
             # Add the challenge to the database
@@ -84,18 +94,24 @@ class ChallengeCommands(commands.Cog):
             await RepoViewerCommands.trigger_update()
             
             # Success message
-            await interaction.followup.send(
-                f"✅ Added challenge: {category}/{name} (#{task_id})\n"
-                f"GitHub scaffold created in `{ctf_name}-{ctf_year}/{category}/{name}/`",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    f"✅ Added challenge: {category}/{name} (#{task_id})\n"
+                    f"GitHub scaffold created in `{ctf_name}-{ctf_year}/{category}/{name}/`",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired when sending success message for challenge_add")
             
         except Exception as e:
             logger.error(f"Error in challenge_add: {e}")
-            await interaction.followup.send(
-                "⚠️ An error occurred while adding the challenge.",
-                ephemeral=True
-            )
+            try:
+                await interaction.followup.send(
+                    "⚠️ An error occurred while adding the challenge.",
+                    ephemeral=True
+                )
+            except discord.errors.NotFound:
+                logger.warning("Interaction expired when sending error for challenge_add")
     
     @app_commands.command(name="challenge_delete", description="Delete a challenge")
     @app_commands.describe(

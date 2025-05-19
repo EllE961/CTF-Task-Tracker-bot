@@ -123,12 +123,21 @@ async def on_application_command_error(ctx, error):
     if isinstance(error, discord.app_commands.CommandInvokeError):
         error = error.original
     
+    # Handle known error types
+    if isinstance(error, discord.errors.NotFound) and error.code == 10062:
+        # This is an interaction timeout - log it but don't notify the user
+        command_name = ctx.command.name if ctx.command else "Unknown command"
+        user = f"{ctx.user.name}" if ctx.user else "Unknown user"
+        guild = ctx.guild.name if ctx.guild else "DM"
+        logger.warning(f"Interaction expired for command '{command_name}' by {user} in {guild}")
+        return
+    
     # Log the full traceback with context
     trace = ''.join(traceback.format_exception(type(error), error, error.__traceback__))
     
     # Get command context for better logging
     command_name = ctx.command.name if ctx.command else "Unknown command"
-    user = f"{ctx.user.name}#{ctx.user.discriminator}" if ctx.user else "Unknown user"
+    user = f"{ctx.user.name}" if ctx.user else "Unknown user"
     guild = ctx.guild.name if ctx.guild else "DM"
     
     logger.error(
@@ -153,6 +162,9 @@ async def on_application_command_error(ctx, error):
             "⚠️ Something went wrong while executing that command.",
             ephemeral=True
         )
+    except discord.errors.NotFound:
+        # If the interaction is no longer valid, don't try to respond
+        logger.debug(f"Could not respond to expired interaction for '{command_name}'")
 
 
 @bot.event

@@ -3,6 +3,7 @@ import os
 import asyncio
 import logging
 import discord
+import time
 from discord import app_commands
 from discord.ext import commands, tasks
 from dotenv import load_dotenv
@@ -26,6 +27,7 @@ class RepoViewerCommands(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.last_message_ids = []  # Store IDs of messages with repo structure
+        self.last_update_time = 0   # Track when the last update happened
         # Register this instance for other cogs to access
         RepoViewerCommands.register_instance(self)
         # Start the auto-update task
@@ -96,6 +98,14 @@ class RepoViewerCommands(commands.Cog):
     
     async def update_repo_view(self):
         """Update the repository view in the dedicated channel."""
+        # Add cooldown check (at least 5 seconds between updates)
+        current_time = time.time()
+        if current_time - self.last_update_time < 5:
+            logger.debug("Skipping repo update - cooldown in effect")
+            return True  # Return success to avoid errors
+            
+        self.last_update_time = current_time
+        
         channel = await self.get_repo_viewer_channel()
         if not channel:
             return False
