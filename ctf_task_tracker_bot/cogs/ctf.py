@@ -466,6 +466,41 @@ class CTFCommands(commands.Cog):
         )
         
         await interaction.response.send_message(embed=embed, ephemeral=True)
+    
+    @app_commands.command(name="give_treat", description="Give a treat to the bot")
+    async def give_treat(self, interaction: discord.Interaction):
+        """Just a fun command to interact with the bot."""
+        # Log command
+        logging_config.log_command(logger, "give_treat", interaction)
+        
+        # List of possible responses
+        responses = [
+            "🍪 Yum! Thanks for the cookie! I'll work extra hard on tracking CTF challenges!",
+            "🍩 A donut! Just what I needed for parsing all those GitHub repositories!",
+            "🍕 Pizza! My favorite fuel for handling Discord slash commands!",
+            "🍦 Ice cream! Cool, just like how I keep the team's CTF progress organized!",
+            "🍫 Chocolate! Sweet, like the feeling of solving CTF challenges!",
+            "🧁 A cupcake! That's a great reward for managing all those claim branches!",
+            "🍎 An apple! Keeping this bot healthy and running smoothly!",
+            "🥓 Bacon! The secret ingredient to successful CTF competitions!",
+            "🍬 Candy! A sweet reward for all those Git merges I've helped with!"
+        ]
+        
+        # Choose a random response
+        import random
+        response = random.choice(responses)
+        
+        # Create a fun embed
+        embed = discord.Embed(
+            title="Treat Received!",
+            description=response,
+            color=discord.Color.gold()
+        )
+        
+        # Add a footer
+        embed.set_footer(text="Thanks for the treat! Happy hacking!")
+        
+        await interaction.response.send_message(embed=embed, ephemeral=False)
 
 async def setup(bot):
     await bot.add_cog(CTFCommands(bot)) 
