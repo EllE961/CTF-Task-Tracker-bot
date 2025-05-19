@@ -114,7 +114,7 @@ A Discord bot to manage CTF challenges, track who's working on what, and organiz
 6. Give the bot these permissions:
    - `Send Messages`
    - `Embed Links`
-   - `Manage Messages`
+   - `Manage Messages` (required for clearing the repo viewer channel)
    - `Read Message History`
    - `Use Application Commands`
    - `Mention @everyone, @here, and All Roles`
@@ -261,6 +261,38 @@ repository/
 │       └── ...
 └── another-ctf-year/
     └── ...
+```
+
+## Repository Viewer
+
+The repository viewer provides a live view of your GitHub repository structure:
+
+1. The bot automatically clears all messages in the `#repo-viewer` channel when it starts up
+2. It displays the current repository structure in a tree format with folders and files
+3. The structure updates automatically:
+   - When the bot starts
+   - After any GitHub operations (adding/solving challenges, etc.)
+   - Every 30 minutes (configurable in .env)
+   - When manually triggered with `/update_repo_view`
+4. The view shows the complete CTF directory structure with emojis for better visualization
+
+Example view:
+```
+# 📁 GitHub Repository Structure
+
+├── 📁 dam-2025/
+│   ├── 📁 web/
+│   │   ├── 📁 login-portal/
+│   │   │   ├── 📁 answer/
+│   │   │   │   ├── 📄 Flag.md
+│   │   │   │   └── 📄 writeup.md
+│   │   │   └── 📁 question/
+│   │   │       └── 📄 README.md
+│   │   └── 📁 admin-panel/
+│   │       └── ...
+│   └── 📁 pwn/
+│       └── ...
+└── 📄 README.md
 ```
 
 ## Troubleshooting

@@ -69,13 +69,29 @@ class RepoViewerCommands(commands.Cog):
     
     async def clear_previous_messages(self, channel):
         """Clear previous repository structure messages."""
-        for msg_id in self.last_message_ids:
-            try:
-                msg = await channel.fetch_message(msg_id)
-                await msg.delete()
-            except (discord.errors.NotFound, discord.errors.Forbidden) as e:
-                logger.warning(f"Failed to delete message {msg_id}: {e}")
+        try:
+            # When the bot starts, we don't have previous message IDs stored
+            # so we need to purge all messages from the channel
+            if not self.last_message_ids:
+                # Delete all messages in the channel (up to 100)
+                deleted = await channel.purge(limit=100)
+                logger.info(f"Purged {len(deleted)} messages from repo viewer channel")
+                return
+            
+            # If we have specific message IDs, just delete those
+            for msg_id in self.last_message_ids:
+                try:
+                    msg = await channel.fetch_message(msg_id)
+                    await msg.delete()
+                except (discord.errors.NotFound, discord.errors.Forbidden) as e:
+                    logger.warning(f"Failed to delete message {msg_id}: {e}")
         
+        except discord.errors.Forbidden:
+            logger.error("Missing permissions to delete messages in repo viewer channel")
+        except Exception as e:
+            logger.error(f"Error clearing messages in repo viewer channel: {e}")
+        
+        # Reset the list of tracked message IDs
         self.last_message_ids = []
     
     async def update_repo_view(self):
@@ -85,14 +101,14 @@ class RepoViewerCommands(commands.Cog):
             return False
         
         try:
+            # Clear previous messages
+            await self.clear_previous_messages(channel)
+            
             # Get repository structure
             structure = await github_utils.get_repo_structure()
             
             # Format the structure as text
             formatted_structure = f"# 📁 GitHub Repository Structure\n\n```\n{github_utils.format_repo_structure(structure)}\n```"
-            
-            # Clear previous messages
-            await self.clear_previous_messages(channel)
             
             # Split into chunks if needed (Discord has 2000 character limit)
             chunks = self._split_message(formatted_structure)
@@ -152,6 +168,21 @@ class RepoViewerCommands(commands.Cog):
         await self.bot.wait_until_ready()
         logger.info("Bot ready, waiting 10 seconds before initial repo structure update")
         await asyncio.sleep(10)  # Wait a bit after startup before first update
+        
+        # Get the repository viewer channel
+        channel = await self.get_repo_viewer_channel()
+        if channel:
+            # Send a temporary message to indicate the bot is preparing the view
+            temp_message = await channel.send("🔄 Preparing repository structure view... Please wait.")
+            
+            # Clear any existing messages before starting
+            await self.clear_previous_messages(channel)
+            
+            # Delete the temporary message
+            try:
+                await temp_message.delete()
+            except:
+                pass
         
         # Initial update
         logger.info("Performing initial repository structure update")
