@@ -100,10 +100,10 @@ async def on_ready():
         logger.info('Synced commands globally (may take up to 1 hour)')
     
     # Update the CTF board on startup
-    logger.info("Updating CTF board at startup...")
+    logger.info("Updating CTF board at startup to reflect fresh state...")
     try:
         await views.update_board(bot)
-        logger.info("CTF board updated successfully")
+        logger.info("CTF board updated successfully - showing fresh state with no active CTF")
     except Exception as e:
         logger.error(f"Error updating CTF board at startup: {e}")
         logger.error(traceback.format_exc())
@@ -190,6 +190,10 @@ async def main():
         # Initialize database
         logger.info("Initializing database...")
         await db.init()
+        
+        # Reset database to fresh state on startup
+        logger.info("Resetting to fresh state...")
+        await db.reset_db()
         
         # Start the bot
         logger.info("Starting bot...")

@@ -19,6 +19,13 @@ import db
 import views
 import logging_config
 
+# Try to import psutil for memory usage stats
+try:
+    import psutil
+    HAS_PSUTIL = True
+except ImportError:
+    HAS_PSUTIL = False
+
 load_dotenv()
 logger = logging.getLogger('bot.cogs.debug')
 LOG_LEVEL = os.getenv('LOG_LEVEL', 'INFO').upper()
@@ -356,6 +363,145 @@ class DebugCommands(commands.Cog):
             logger.error(f"Error refreshing board: {e}")
             await interaction.followup.send(
                 f"⚠️ Error refreshing board: {e}",
+                ephemeral=True
+            )
+    
+    @app_commands.command(name="debug", description="Show comprehensive debug information and statistics")
+    async def debug(self, interaction: discord.Interaction):
+        """Show comprehensive debug information about the bot, system, network, and database."""
+        logging_config.log_command(logger, "debug", interaction)
+        
+        # Defer response to allow time to gather all information
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        
+        try:
+            # Start timing
+            start_time = time.time()
+            
+            # Measure Discord API latency
+            latency_ms = round(self.bot.latency * 1000)
+            
+            # Get uptime
+            uptime = datetime.now() - self.startup_time
+            uptime_str = str(uptime).split('.')[0]  # Remove microseconds
+            
+            # Get active CTF
+            ctf_name, ctf_year = await db.get_active_ctf()
+            active_ctf = f"{ctf_name}-{ctf_year}" if ctf_name and ctf_year else "None"
+            
+            # Get database stats
+            db_stats = await db.get_db_stats()
+            
+            # Get memory usage (this is an approximation)
+            if HAS_PSUTIL:
+                try:
+                    process = psutil.Process(os.getpid())
+                    memory_usage = f"{process.memory_info().rss / 1024 / 1024:.2f} MB"
+                except Exception as e:
+                    memory_usage = f"Error: {str(e)}"
+            else:
+                memory_usage = "N/A (psutil not installed)"
+            
+            # Create embed
+            embed = discord.Embed(
+                title="🛠️ Debug Information",
+                description="Comprehensive system status and diagnostics",
+                color=discord.Color.gold()
+            )
+            
+            # Bot information
+            embed.add_field(
+                name="🤖 Bot Status",
+                value=(
+                    f"**Name:** {self.bot.user.name}\n"
+                    f"**ID:** {self.bot.user.id}\n"
+                    f"**Uptime:** {uptime_str}\n"
+                    f"**Active CTF:** {active_ctf}\n"
+                    f"**Guilds:** {len(self.bot.guilds)}\n"
+                    f"**User Count:** {sum(g.member_count for g in self.bot.guilds)}\n"
+                    f"**Latency:** {latency_ms}ms"
+                ),
+                inline=False
+            )
+            
+            # System information
+            embed.add_field(
+                name="💻 System Information",
+                value=(
+                    f"**OS:** {platform.system()} {platform.release()}\n"
+                    f"**Version:** {platform.version()}\n"
+                    f"**Architecture:** {platform.machine()}\n"
+                    f"**Python:** {platform.python_version()}\n"
+                    f"**Discord.py:** {discord.__version__}\n"
+                    f"**Memory Usage:** {memory_usage}\n"
+                    f"**Log Level:** {LOG_LEVEL}"
+                ),
+                inline=False
+            )
+            
+            # Current directory and files
+            try:
+                current_dir = os.getcwd()
+                dir_size = sum(os.path.getsize(os.path.join(current_dir, f)) for f in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, f)))
+                dir_size_mb = dir_size / (1024 * 1024)
+                file_count = len([f for f in os.listdir(current_dir) if os.path.isfile(os.path.join(current_dir, f))])
+                
+                embed.add_field(
+                    name="📂 Working Directory",
+                    value=(
+                        f"**Path:** {current_dir}\n"
+                        f"**Files:** {file_count}\n"
+                        f"**Size:** {dir_size_mb:.2f} MB"
+                    ),
+                    inline=False
+                )
+            except Exception as e:
+                embed.add_field(
+                    name="📂 Working Directory",
+                    value=f"Error: {str(e)}",
+                    inline=False
+                )
+            
+            # Database information
+            tasks_count = db_stats.get('tasks_count', 'Unknown')
+            
+            embed.add_field(
+                name="🗄️ Database",
+                value=(
+                    f"**Path:** {os.path.abspath(db.DB_PATH)}\n"
+                    f"**Size:** {os.path.getsize(db.DB_PATH) / 1024:.2f} KB\n"
+                    f"**Tasks:** {tasks_count}\n"
+                    f"**Queries Executed:** {db_stats.get('queries_executed', 'Unknown')}\n"
+                    f"**Longest Query:** {db_stats.get('longest_query', {}).get('time', 0):.6f}s\n"
+                ),
+                inline=False
+            )
+            
+            # Network information
+            try:
+                hostname = platform.node()
+                embed.add_field(
+                    name="🌐 Network",
+                    value=(
+                        f"**Hostname:** {hostname}\n"
+                        f"**Bot WebSocket Ping:** {latency_ms}ms\n"
+                        f"**Processing Time:** {(time.time() - start_time) * 1000:.2f}ms\n"
+                    ),
+                    inline=False
+                )
+            except Exception as e:
+                embed.add_field(
+                    name="🌐 Network",
+                    value=f"Error retrieving network info: {str(e)}",
+                    inline=False
+                )
+            
+            # Send the embed
+            await interaction.followup.send(embed=embed, ephemeral=True)
+        except Exception as e:
+            logger.error(f"Error in debug command: {e}")
+            await interaction.followup.send(
+                f"⚠️ Error collecting debug information: {str(e)}\n\n{traceback.format_exc()}",
                 ephemeral=True
             )
 

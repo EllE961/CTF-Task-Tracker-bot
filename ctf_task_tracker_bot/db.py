@@ -378,4 +378,18 @@ async def delete_all_tasks():
     # Reset the AUTOINCREMENT counter by recreating the table
     await run("DELETE FROM sqlite_sequence WHERE name = 'tasks'")
     
-    logger.info(f"All {count} tasks deleted from database and ID counter reset") 
+    logger.info(f"All {count} tasks deleted from database and ID counter reset")
+
+async def reset_db():
+    """Reset the database to a fresh state for a new session."""
+    logger.warning("Resetting database to fresh state")
+    
+    # Clear active CTF
+    await clear_active_ctf()
+    
+    # Delete all tasks
+    await delete_all_tasks()
+    
+    # Keep board message IDs intact to avoid recreation
+    
+    logger.info("Database reset complete - fresh state with no active CTF or challenges") 
