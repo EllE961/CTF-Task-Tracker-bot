@@ -19,6 +19,7 @@ from cogs.challenge import ChallengeCommands
 from cogs.repo_viewer import RepoViewerCommands
 import logging_config
 from cogs.debug import DebugCommands
+import web_server
 
 # Start execution timer for startup metrics
 start_time = time.time()
@@ -90,6 +91,11 @@ async def on_ready():
         logger.debug("Debug commands enabled in DEBUG mode")
     else:
         logger.info("Debug commands available for operational use")
+    
+    # Get active CTF info for web server
+    ctf_name, ctf_year = await db.get_active_ctf()
+    bot.active_ctf_name = ctf_name
+    bot.active_ctf_year = ctf_year
     
     # Sync commands
     if DEFAULT_GUILD:
@@ -196,6 +202,10 @@ async def main():
         # Reset database to fresh state on startup
         logger.info("Resetting to fresh state...")
         await db.reset_db()
+        
+        # Start the web server for Render.com and UptimeRobot
+        logger.info("Starting web server for ping endpoint...")
+        web_server.run_web_server(bot=bot)
         
         # Start the bot
         logger.info("Starting bot...")
