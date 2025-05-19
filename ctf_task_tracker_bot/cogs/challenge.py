@@ -13,6 +13,7 @@ import db
 import github_utils
 import views
 import logging_config
+from cogs.repo_viewer import RepoViewerCommands
 
 load_dotenv()
 logger = logging.getLogger('bot.cogs.challenge')
@@ -78,6 +79,9 @@ class ChallengeCommands(commands.Cog):
             
             # Update the board
             await views.update_board(self.bot)
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             # Success message
             await interaction.followup.send(
@@ -261,6 +265,9 @@ class ChallengeCommands(commands.Cog):
         # Update the board
         await views.update_board(self.bot)
         
+        # Update the repo viewer
+        await RepoViewerCommands.trigger_update()
+        
         # Build response message
         if success_count > 0:
             response = [f"Added {success_count}/{len(challenge_list)} challenges to `{ctf_folder}/`:"]
@@ -377,6 +384,9 @@ class ChallengeCommands(commands.Cog):
             
             # Update the board
             await views.update_board(self.bot)
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             # Format the CTF folder path
             ctf_folder = f"{ctf_name.lower()}-{ctf_year}"
@@ -511,6 +521,9 @@ class ChallengeCommands(commands.Cog):
             # Update the board
             await views.update_board(self.bot)
             
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
+            
             # Success message
             await interaction.followup.send(
                 f"✅ Unclaimed challenge #{task_id}.",
@@ -610,6 +623,9 @@ class ChallengeCommands(commands.Cog):
             
             # Update the board
             await views.update_board(self.bot)
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             # Format the CTF folder path
             ctf_folder = f"{ctf_name.lower()}-{ctf_year}"

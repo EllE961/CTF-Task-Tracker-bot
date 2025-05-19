@@ -13,6 +13,7 @@ import db
 import github_utils
 import views
 import logging_config
+from cogs.repo_viewer import RepoViewerCommands
 
 load_dotenv()
 logger = logging.getLogger('bot.cogs.ctf')
@@ -119,6 +120,9 @@ class CTFCommands(commands.Cog):
             repo_private = await github_utils.set_repo_private()
             privacy_status = "and set to private" if repo_private else "(note: failed to set repository to private)"
             
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
+            
             # Send success message
             await interaction.followup.send(
                 f"✅ Now tracking `{name}-{year}` as the active CTF {privacy_status}.\n"
@@ -161,6 +165,9 @@ class CTFCommands(commands.Cog):
             
             # Update the board to show "No active CTF"
             await views.update_board(self.bot)
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             await interaction.followup.send(
                 f"✅ Marked `{ctf_name}-{ctf_year}` as finished. No more challenges can be added.\n"
@@ -205,6 +212,9 @@ class CTFCommands(commands.Cog):
             success = await github_utils.set_repo_public()
             
             if success:
+                # Update the repo viewer
+                await RepoViewerCommands.trigger_update()
+                
                 await interaction.followup.send(
                     "✅ Repository has been successfully made public.\n"
                     "All CTF content is now publicly accessible.",
@@ -251,6 +261,9 @@ class CTFCommands(commands.Cog):
         try:
             # Delete claim branches for this CTF
             deleted_count = await github_utils.delete_claim_branches(name, year)
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             if deleted_count > 0:
                 await interaction.followup.send(
@@ -329,6 +342,9 @@ class CTFCommands(commands.Cog):
             if active_name == name and active_year == year:
                 message.append("- Cleared as active CTF")
                 message.append("- All tasks deleted from database")
+            
+            # Update the repo viewer
+            await RepoViewerCommands.trigger_update()
             
             await interaction.followup.send(
                 "\n".join(message),

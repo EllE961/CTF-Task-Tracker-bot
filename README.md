@@ -15,6 +15,7 @@ A Discord bot to manage CTF challenges, track who's working on what, and organiz
   - Real-time board updates showing who's working on what
   - Claim/unclaim system with conflict prevention
   - Solved challenge tracking
+  - Live repository structure view in a dedicated Discord channel
 - **Git Workflow Automation**:
   - Automatic DMs with contextual Git instructions
   - Branch management to prevent conflicts
@@ -87,6 +88,12 @@ A Discord bot to manage CTF challenges, track who's working on what, and organiz
    # Discord channel ID for the CTF board
    BOARD_CHANNEL_ID=1234567890123456789
    
+   # Discord channel ID for the repository structure viewer
+   REPO_VIEWER_CHANNEL_ID=1234567890123456789
+   
+   # Repository viewer update interval (in minutes)
+   REPO_UPDATE_INTERVAL=30
+   
    # Discord guild ID for slash command registration
    DEFAULT_GUILD=1234567890123456789
    
@@ -100,10 +107,11 @@ A Discord bot to manage CTF challenges, track who's working on what, and organiz
 ### Discord Server Setup
 
 1. Create a dedicated `#ctf-board` channel for the bot to post the task board
-2. Find the channel ID (right-click channel → Copy ID) and add it to `.env`
-3. Create a `CTF Lead` role (or customize the name in `.env`) for users who can manage CTFs
-4. Find your Discord server ID (right-click server → Copy ID) and add it to `.env` as DEFAULT_GUILD
-5. Give the bot these permissions:
+2. Create a dedicated `#repo-viewer` channel for displaying the repository structure
+3. Find the channel IDs (right-click channel → Copy ID) and add them to `.env`
+4. Create a `CTF Lead` role (or customize the name in `.env`) for users who can manage CTFs
+5. Find your Discord server ID (right-click server → Copy ID) and add it to `.env` as DEFAULT_GUILD
+6. Give the bot these permissions:
    - `Send Messages`
    - `Embed Links`
    - `Manage Messages`
@@ -145,6 +153,8 @@ Once started, the bot will automatically:
 | `/challenge_add category:<str> name:<str>` | Everyone        | Add a single challenge to the active CTF         |
 | `/challenges_add challenges:<str>`         | Everyone        | Add multiple challenges at once (see format below) |
 | `/challenge_delete id:<int>`               | Manage Messages | Remove a challenge from board and GitHub         |
+| `/update_repo_view`                        | Everyone        | Manually update the repository structure display  |
+| `/show_repo_structure`                     | Everyone        | Show the repository structure in the current channel |
 | `/help`                                    | Everyone        | Show command reference and workflow              |
 
 #### Multi-Challenge Format

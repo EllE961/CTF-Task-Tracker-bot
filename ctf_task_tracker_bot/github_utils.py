@@ -474,4 +474,109 @@ async def delete_claim_branches(ctf_name: str, ctf_year: int) -> int:
         return deleted_count
     except Exception as e:
         logger.error(f"Unexpected error deleting claim branches: {e}")
-        return deleted_count 
+        return deleted_count
+
+async def get_repo_structure(path: str = "") -> dict:
+    """
+    Get the structure of the repository recursively.
+    
+    Args:
+        path: Path to get the structure from (empty for root)
+        
+    Returns:
+        A nested dictionary representing the repository structure
+    """
+    try:
+        # Run GitHub operations in the thread pool
+        loop = asyncio.get_event_loop()
+        repo = await loop.run_in_executor(_executor, _get_repo)
+        
+        # Get contents at the path
+        contents = await loop.run_in_executor(
+            _executor,
+            partial(repo.get_contents, path)
+        )
+        
+        # Initialize structure
+        structure = {}
+        
+        # If it's a single file, return its name
+        if not isinstance(contents, list):
+            return {"type": "file", "name": contents.name}
+        
+        # Process directory contents
+        for item in contents:
+            if item.type == "dir":
+                # Recursively get structure of subdirectory
+                sub_structure = await get_repo_structure(item.path)
+                structure[item.name] = sub_structure
+            else:
+                # Add file to structure
+                structure[item.name] = {"type": "file"}
+        
+        return {"type": "dir", "contents": structure}
+        
+    except GithubException as e:
+        logger.error(f"GitHub error getting repo structure: {e}")
+        return {"type": "error", "message": str(e)}
+    except Exception as e:
+        logger.error(f"Unexpected error getting repo structure: {e}")
+        return {"type": "error", "message": str(e)}
+
+def format_repo_structure(structure: dict, prefix: str = "") -> str:
+    """
+    Format the repository structure as a text-based tree.
+    
+    Args:
+        structure: Repository structure dictionary
+        prefix: Prefix for indentation
+        
+    Returns:
+        Formatted string representation of the repository
+    """
+    if structure.get("type") == "error":
+        return f"Error: {structure.get('message', 'Unknown error')}"
+    
+    if structure.get("type") == "file":
+        return f"{prefix}📄 {structure.get('name', 'unnamed')}"
+    
+    result = []
+    contents = structure.get("contents", {})
+    
+    # Sort items: directories first, then files, both alphabetically
+    dirs = []
+    files = []
+    
+    for name, item in contents.items():
+        if item.get("type") == "dir":
+            dirs.append((name, item))
+        else:
+            files.append((name, item))
+    
+    # Sort each list
+    dirs.sort(key=lambda x: x[0])
+    files.sort(key=lambda x: x[0])
+    
+    # Process directories
+    for i, (name, item) in enumerate(dirs):
+        is_last_dir = (i == len(dirs) - 1 and len(files) == 0)
+        if is_last_dir:
+            result.append(f"{prefix}└── 📁 {name}/")
+            sub_prefix = f"{prefix}    "
+        else:
+            result.append(f"{prefix}├── 📁 {name}/")
+            sub_prefix = f"{prefix}│   "
+        
+        # Add subdirectory contents
+        sub_result = format_repo_structure(item, sub_prefix)
+        if sub_result:
+            result.append(sub_result)
+    
+    # Process files
+    for i, (name, _) in enumerate(files):
+        if i == len(files) - 1:
+            result.append(f"{prefix}└── 📄 {name}")
+        else:
+            result.append(f"{prefix}├── 📄 {name}")
+    
+    return "\n".join(result) 

@@ -16,6 +16,7 @@ import db
 import views
 from cogs.ctf import CTFCommands
 from cogs.challenge import ChallengeCommands
+from cogs.repo_viewer import RepoViewerCommands
 import logging_config
 from cogs.debug import DebugCommands
 
@@ -81,6 +82,7 @@ async def on_ready():
     # Register cogs
     await bot.add_cog(CTFCommands(bot))
     await bot.add_cog(ChallengeCommands(bot))
+    await bot.add_cog(RepoViewerCommands(bot))
     
     # Add debug commands if in DEBUG mode
     if LOG_LEVEL == 'DEBUG':
