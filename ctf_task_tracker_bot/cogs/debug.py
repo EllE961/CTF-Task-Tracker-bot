@@ -55,13 +55,25 @@ class DebugCommands(commands.Cog):
             
         return True
     
+    async def _check_command_access(self, interaction: discord.Interaction, command_name: str) -> bool:
+        """
+        Check access permissions for debug commands.
+        The main '/debug' command is available to everyone, but other debug_* commands require admin.
+        """
+        # The main /debug command is available to everyone
+        if command_name == "debug":
+            return True
+            
+        # Other debug commands require admin privileges
+        return await self._is_admin(interaction)
+    
     @app_commands.command(name="debug_status", description="Show bot status and diagnostics")
     async def debug_status(self, interaction: discord.Interaction):
         """Display detailed bot status information for debugging."""
         logging_config.log_command(logger, "debug_status", interaction)
         
         # Check if user is an admin
-        if not await self._is_admin(interaction):
+        if not await self._check_command_access(interaction, "debug_status"):
             return
         
         # Gather system information
@@ -147,7 +159,7 @@ class DebugCommands(commands.Cog):
         logging_config.log_command(logger, "debug_log", interaction, lines=lines, level=level)
         
         # Check if user is an admin
-        if not await self._is_admin(interaction):
+        if not await self._check_command_access(interaction, "debug_log"):
             return
         
         # Validate and limit lines
@@ -221,7 +233,7 @@ class DebugCommands(commands.Cog):
         logging_config.log_command(logger, "debug_task", interaction, task_id=task_id)
         
         # Check if user is an admin
-        if not await self._is_admin(interaction):
+        if not await self._check_command_access(interaction, "debug_task"):
             return
         
         # Defer response
@@ -339,7 +351,7 @@ class DebugCommands(commands.Cog):
         logging_config.log_command(logger, "debug_refresh_board", interaction)
         
         # Check if user is an admin
-        if not await self._is_admin(interaction):
+        if not await self._check_command_access(interaction, "debug_refresh_board"):
             return
         
         # Defer response
@@ -371,6 +383,10 @@ class DebugCommands(commands.Cog):
         """Show comprehensive debug information about the bot, system, network, and database."""
         logging_config.log_command(logger, "debug", interaction)
         
+        # Check access - this should always pass for the /debug command
+        if not await self._check_command_access(interaction, "debug"):
+            return
+            
         # Defer response to allow time to gather all information
         await interaction.response.defer(ephemeral=True, thinking=True)
         

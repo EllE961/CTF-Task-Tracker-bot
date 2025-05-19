@@ -84,10 +84,12 @@ async def on_ready():
     await bot.add_cog(ChallengeCommands(bot))
     await bot.add_cog(RepoViewerCommands(bot))
     
-    # Add debug commands if in DEBUG mode
+    # Always add the debug commands (but in DEBUG mode, log it)
+    await bot.add_cog(DebugCommands(bot))
     if LOG_LEVEL == 'DEBUG':
-        await bot.add_cog(DebugCommands(bot))
-        logger.debug("Debug commands enabled")
+        logger.debug("Debug commands enabled in DEBUG mode")
+    else:
+        logger.info("Debug commands available for operational use")
     
     # Sync commands
     if DEFAULT_GUILD:
