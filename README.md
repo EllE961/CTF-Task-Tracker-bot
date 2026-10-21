@@ -1,344 +1,140 @@
-# CTF Task-Tracker Discord Bot
+<div align="center">
 
-A Discord bot to manage CTF challenges, track who's working on what, and organize write-ups in a GitHub repository with automatic GitHub scaffolding and Git workflow management.
+# CTF Task Tracker Bot
 
-## Features
+**A Discord bot for running a CTF as a team: slash commands track each challenge on a live board and scaffold a matching folder tree and per-person branch in a GitHub repo.**
 
-- **CTF Management**: Create, track, and archive different CTF competitions
-- **Challenge Tracking**: Organize challenges by category with customizable attributes
-- **GitHub Integration**: 
-  - Automatic folder structure scaffolding for each challenge
-  - Branch creation for claims to prevent conflicts
-  - Solved markers and writeup templates
-  - Automatic privacy management (private during active CTF, can be made public after)
-- **Team Coordination**:
-  - Real-time board updates showing who's working on what
-  - Claim/unclaim system with conflict prevention
-  - Solved challenge tracking
-  - Live repository structure view in a dedicated Discord channel
-- **Git Workflow Automation**:
-  - Automatic DMs with contextual Git instructions
-  - Branch management to prevent conflicts
-  - Step-by-step merge instructions when challenges are solved
-- **Role-Based Permissions**: Team lead controls for CTF management
-- **Bulk Operations**: Add multiple challenges at once with simple formatting
+![python](https://img.shields.io/badge/python-3.10+-1f1d1b?style=flat-square&labelColor=0d0c0b)
+![discord.py](https://img.shields.io/badge/discord.py-2.x-d95926?style=flat-square&labelColor=0d0c0b)
+![slash commands](https://img.shields.io/badge/slash%20commands-18-3987e5?style=flat-square&labelColor=0d0c0b)
+![license](https://img.shields.io/badge/license-MIT-1f1d1b?style=flat-square&labelColor=0d0c0b)
 
-## Architecture
+</div>
 
-```
-┌────────────┐
-│ Discord UI │  ← slash commands & button clicks
-└──────┬─────┘
-       │      asyncio
-┌──────▼──────────────────────────────────────────┐
-│ bot.py  (Discord client + logging bootstrap)    │
-│   ├─ cogs.ctf        – CTF-lifecycle commands   │
-│   ├─ cogs.challenge  – challenge CRUD & buttons │
-│   ├─ views.py        – board embed + UI layer   │
-│   ├─ db.py           – async SQLite DAO         │
-│   ├─ github_utils.py – PyGithub (thread-pooled) │
-│   └─ logs/bot.log    – rotating diagnostics     │
-└────────┬────────────────────────────────────────┘
-         │         thread-pool tasks
-┌────────▼────────┐  ┌──────────────┐
-│ SQLite (tasks & │  │ GitHub Repo   │
-│  state tables)  │  │  (write-ups) │
-└─────────────────┘  └──────────────┘
+During a CTF my team kept losing track of who was on which challenge and where the writeups lived. This bot keeps both in one place. A challenge added from Discord shows up on a pinned board with Claim and Solved buttons, and the same action creates the challenge's folder (with Flag and writeup templates) and a personal branch in a GitHub repo, so claiming a task in chat and pushing your work line up without anyone copying paths by hand.
+
+## How it works
+
+```mermaid
+flowchart LR
+    user[Discord member] -->|slash commands| bot[bot.py<br/>discord.py cogs]
+    bot --> db[(SQLite<br/>tasks · active CTF · board msg)]
+    bot -->|PyGithub in a threadpool| gh[GitHub repo]
+    gh --> scaf[scaffold folders<br/>category/challenge/answer/Flag.md]
+    gh --> br[claim-user-challenge<br/>branch off main]
+    bot -->|hourly + after each change| board[board embed<br/>Claim · Unclaim · Solved buttons]
+    uptime[UptimeRobot] -->|GET /ping| web[Flask web server]
+    web --- bot
+
+    classDef a fill:#2a1710,stroke:#d95926,color:#ecebe6
+    classDef b fill:#0f1d30,stroke:#3987e5,color:#ecebe6
+    classDef c fill:#0c231b,stroke:#199e70,color:#ecebe6
+    classDef d fill:#1c1a33,stroke:#9085e9,color:#ecebe6
+    class user,board a
+    class bot,web b
+    class db,gh d
+    class scaf,br c
 ```
 
-## Setup
+The bot stores task state in a local SQLite database (`aiosqlite`) and mirrors structure into GitHub through `PyGithub`. Because PyGithub is synchronous, every GitHub call runs in a thread pool so it does not block the Discord event loop. A Flask server exposes `/`, `/health` and `/ping` so a free host like Render can be kept awake by UptimeRobot. The board message id is stored in the database, so the hourly refresh and the post-action refresh edit the same message in place.
 
-### Prerequisites
+## What a challenge creates in GitHub
 
-- Python 3.10+
-- A Discord bot token (https://discord.com/developers/applications)
-- A GitHub Personal Access Token with repo scope
-- A dedicated Discord server with appropriate channels
+Adding a CTF and a challenge builds this layout in the configured repository, and claiming it adds a branch named `claim-{username}-{challenge}` off `main`:
 
-### Installation
+```text
+dam-2025/                       # <ctf-name>-<year>
+  README.md
+  pwn/                          # category
+    heap-note/                  # challenge
+      question/
+        README.md               # prompt
+      answer/
+        Flag.md                 # flag goes here
+        writeup.md              # solution notes
+        SOLVED                  # empty marker, added when a challenge is solved
+```
 
-1. Clone the repository:
-   ```bash
-   git clone <repository-url>
-   cd CTF-Task-Tracker-bot
-   ```
+The repository is made private while a CTF is active and can be flipped public with `/ctf_publish` once nothing is running, which is how writeups get shared after the event.
 
-2. Install the required dependencies:
-   ```bash
-   pip install -r ctf_task_tracker_bot/requirements.txt
-   ```
+## Commands
 
-3. Copy `ctf_task_tracker_bot/env.example` to `.env` in the same directory and fill in your details:
-   ```bash
-   cp ctf_task_tracker_bot/env.example ctf_task_tracker_bot/.env
-   ```
+All commands are Discord slash commands. The bot syncs them to `DEFAULT_GUILD` on startup when that is set, otherwise globally.
 
-4. Edit the `.env` file with your settings:
+| Command | What it does |
+|---|---|
+| `/ctf_add` | Start a new CTF session (sets the active CTF, creates its folder) |
+| `/ctf_done` | Mark the current CTF as finished |
+| `/ctf_publish` | Make the repository public, allowed only when no CTF is active |
+| `/ctf_list` | List the CTF directories in the GitHub repository |
+| `/ctf_clear` | Delete the claim branches for a CTF |
+| `/ctf_delete` | Delete a CTF and all of its challenges |
+| `/challenge_add` | Add one challenge to the active CTF and scaffold its folder |
+| `/challenges_add` | Add several challenges at once |
+| `/challenge_delete` | Remove a challenge |
+| `/show_repo_structure` | Print the repository tree in the current channel |
+| `/update_repo_view` | Refresh the repository structure view |
+| `/help` | Show the command list |
+| `/give_treat` | A small fun response from the bot |
+| `/debug` | Full diagnostics and statistics |
+| `/debug_status` | Bot status (uptime, guilds, versions) |
+| `/debug_log` | Recent log entries |
+| `/debug_task` | Details for one task |
+| `/debug_refresh_board` | Force the board message to re-render |
 
-   ```ini
-   # Discord Bot Token from https://discord.com/developers/applications
-   DISCORD_TOKEN=your_discord_token_here
-   
-   # GitHub Personal Access Token (needs repo scope)
-   GITHUB_TOKEN=your_github_token_here
-   
-   # GitHub repository in format "username/repo"
-   GITHUB_REPO=username/repository_name
-   
-   # Discord channel ID for the CTF board
-   BOARD_CHANNEL_ID=1234567890123456789
-   
-   # Discord channel ID for the repository structure viewer
-   REPO_VIEWER_CHANNEL_ID=1234567890123456789
-   
-   # Repository viewer update interval (in minutes)
-   REPO_UPDATE_INTERVAL=30
-   
-   # Discord guild ID for slash command registration
-   DEFAULT_GUILD=1234567890123456789
-   
-   # Role name for CTF administrators (can be customized)
-   LEAD_ROLE_NAME=CTF Lead
-   
-   # Logging level (DEBUG, INFO, WARNING, ERROR)
-   LOG_LEVEL=INFO
-   ```
+The board itself is interactive: an unclaimed challenge shows a Claim button, a claimed one shows Unclaim and Solved, and claiming is what creates the per-person branch.
 
-### Discord Server Setup
-
-1. Create a dedicated `#ctf-board` channel for the bot to post the task board
-2. Create a dedicated `#repo-viewer` channel for displaying the repository structure
-3. Find the channel IDs (right-click channel → Copy ID) and add them to `.env`
-4. Create a `CTF Lead` role (or customize the name in `.env`) for users who can manage CTFs
-5. Find your Discord server ID (right-click server → Copy ID) and add it to `.env` as DEFAULT_GUILD
-6. Give the bot these permissions:
-   - `Send Messages`
-   - `Embed Links`
-   - `Manage Messages` (required for clearing the repo viewer channel)
-   - `Read Message History`
-   - `Use Application Commands`
-   - `Mention @everyone, @here, and All Roles`
-
-### GitHub Setup
-
-1. Create a new GitHub repository to store CTF challenges and write-ups
-2. Generate a Personal Access Token with `repo` scope at https://github.com/settings/tokens
-3. Add the repository name (`username/repo`) and token to the `.env` file
-
-## Usage
-
-### Starting the Bot
+## Quickstart
 
 ```bash
-cd ctf_task_tracker_bot
+git clone https://github.com/EllE961/CTF-Task-Tracker-bot.git
+cd CTF-Task-Tracker-bot/ctf_task_tracker_bot
+pip install -r requirements.txt
+
+cp env.example .env     # then fill in the values below
 python bot.py
 ```
 
-Once started, the bot will automatically:
-- Initialize the database if it doesn't exist
-- Register slash commands with Discord
-- Create a board message in the configured channel
-- Set up hourly automatic board refreshes
+`.env` keys the bot reads:
 
-### Commands
-
-| Command                                    | Permission      | Description                                      |
-| ------------------------------------------ | --------------- | ------------------------------------------------ |
-| `/ctf_add name:<str> year:<int>`           | Lead            | Start a new CTF, reset challenges, set repo private |
-| `/ctf_done`                                | Lead            | Mark the current CTF as finished                 |
-| `/ctf_publish`                             | Lead            | Make the repository public when no active CTF    |
-| `/ctf_delete name year`                    | Lead            | Delete a CTF including GitHub files              |
-| `/ctf_clear name year`                     | Lead            | Clean up claim branches for repository tidiness  |
-| `/ctf_list`                                | Everyone        | Display all CTFs in the repository               |
-| `/challenge_add category:<str> name:<str>` | Everyone        | Add a single challenge to the active CTF         |
-| `/challenges_add challenges:<str>`         | Everyone        | Add multiple challenges at once (see format below) |
-| `/challenge_delete id:<int>`               | Manage Messages | Remove a challenge from board and GitHub         |
-| `/update_repo_view`                        | Everyone        | Manually update the repository structure display  |
-| `/show_repo_structure`                     | Everyone        | Show the repository structure in the current channel |
-| `/debug`                                   | Everyone        | Show comprehensive system status and network info |
-| `/give_treat`                              | Everyone        | Give the bot a treat (just for fun)               |
-| `/help`                                    | Everyone        | Show command reference and workflow              |
-
-#### Multi-Challenge Format
-
-When using `/challenges_add`, format your challenges as a comma-separated list of `category:name` pairs:
-
-```
-/challenges_add challenges:web:login,pwn:shellcode,crypto:rsa,web:admin
+```text
+DISCORD_TOKEN           bot token from the Discord developer portal
+DEFAULT_GUILD           guild id to sync commands to instantly (optional)
+GITHUB_TOKEN            a token with repo scope on GITHUB_REPO
+GITHUB_REPO             owner/name of the repo to scaffold into
+BOARD_CHANNEL_ID        channel for the live task board
+REPO_VIEWER_CHANNEL_ID  channel for the repository structure view
+PORT                    port for the Flask keep-alive server (default 8080)
+LEAD_ROLE_NAME          role allowed to run session-level commands
+LOG_LEVEL               INFO or DEBUG
 ```
 
-This will add 4 challenges: 
-- "login" in the web category
-- "shellcode" in the pwn category 
-- "rsa" in the crypto category
-- "admin" in the web category
+The bot needs the message content and server members intents enabled on its application, and the GitHub token needs write access to the target repository.
 
-### Board Buttons
+## Repository map
 
-The challenge board provides interactive buttons for each challenge:
-
-- **🔷 Claim**: Claim a challenge to work on it
-  - Creates a GitHub branch automatically
-  - DMs you Git instructions
-  - Updates the board with your name
-  - Prevents others from claiming the same challenge
-
-- **⚪ Unclaim**: Release a challenge you've claimed
-  - Makes it available for others
-  - Updates the board
-
-- **✅ Solved**: Mark your claimed challenge as solved
-  - Creates a SOLVED marker in GitHub
-  - DMs you Git instructions for merging
-  - Updates the board
-
-### Workflow Example
-
-1. Team lead starts a CTF:
-   ```
-   /ctf_add name:dam year:2025
-   ```
-   This sets the repository to private for security during the competition.
-
-2. Add challenges individually or in bulk:
-   ```
-   /challenge_add category:web name:login-portal
-   /challenges_add challenges:pwn:ret2win,web:admin-panel,crypto:weak-prng
-   ```
-
-3. The challenge board is created showing all challenges by category
-
-4. Team members claim challenges by clicking the **Claim** button on the board
-
-5. After claiming, members receive Git instructions via DM:
-   ```
-   # First make sure you're on main and it's clean
-   git switch main
-   git pull
-
-   # Create/switch to claim branch
-   git switch claim-username-challenge 2>/dev/null || git switch -c claim-username-challenge origin/claim-username-challenge
-   ```
-
-6. When solved, members click **Solved** and receive merge instructions:
-   ```
-   # 1. Make sure all your changes are committed
-   git status  # Check what files need to be added
-   git add dam-2025/category/challenge/
-   git commit -m "Solved category/challenge"
-
-   # 2. Push your solution
-   git push -u origin claim-username-challenge
-
-   # 3. Merge to main (automated)
-   git switch main
-   git pull  # Get latest changes
-   git merge --no-ff claim-username-challenge -m "Merge solution for category/challenge"
-   git push
-   ```
-
-7. After the CTF, run `/ctf_done` to lock it and prepare for the next one
-
-8. When ready to share your team's write-ups, run `/ctf_publish` to make the repository public
-
-## GitHub Repository Structure
-
-The bot organizes your CTF repository with a consistent structure:
-
-```
-repository/
-├── ctf-name-year/
-│   ├── README.md
-│   ├── category1/
-│   │   ├── challenge1/
-│   │   │   ├── question/
-│   │   │   │   └── README.md  # Challenge description
-│   │   │   └── answer/
-│   │   │       ├── Flag.md    # Captured flag
-│   │   │       ├── SOLVED     # Marker file (if solved)
-│   │   │       └── writeup.md # Solution approach
-│   │   └── challenge2/
-│   │       └── ...
-│   └── category2/
-│       └── ...
-└── another-ctf-year/
-    └── ...
+```text
+ctf_task_tracker_bot/
+  bot.py            entry point: intents, cog loading, error handler, hourly board refresh
+  cogs/ctf.py       /ctf_* session commands
+  cogs/challenge.py /challenge* scaffolding commands
+  cogs/repo_viewer.py repository structure views
+  cogs/debug.py     /debug* diagnostics
+  github_utils.py   PyGithub: scaffold folders, claim branches, public/private toggle (threadpool)
+  db.py             aiosqlite schema and queries: tasks, active_ctf, board_msg, db_stats
+  views.py          board embed and the Claim/Unclaim/Solved buttons
+  web_server.py     Flask /, /health, /ping for uptime pings
+  logging_config.py logging setup
+  env.example       configuration template
 ```
 
-## Repository Viewer
+## Limitations
 
-The repository viewer provides a live view of your GitHub repository structure:
-
-1. The bot automatically clears all messages in the `#repo-viewer` channel when it starts up
-2. It displays the current repository structure in a tree format with folders and files
-3. The structure updates automatically:
-   - When the bot starts
-   - After any GitHub operations (adding/solving challenges, etc.)
-   - Every 30 minutes (configurable in .env)
-   - When manually triggered with `/update_repo_view`
-4. The view shows the complete CTF directory structure with emojis for better visualization
-
-Example view:
-```
-# 📁 GitHub Repository Structure
-
-├── 📁 dam-2025/
-│   ├── 📁 web/
-│   │   ├── 📁 login-portal/
-│   │   │   ├── 📁 answer/
-│   │   │   │   ├── 📄 Flag.md
-│   │   │   │   └── 📄 writeup.md
-│   │   │   └── 📁 question/
-│   │   │       └── 📄 README.md
-│   │   └── 📁 admin-panel/
-│   │       └── ...
-│   └── 📁 pwn/
-│       └── ...
-└── 📄 README.md
-```
-
-## Debug & Utility Features
-
-The bot includes several utility and debug features to help with monitoring and team engagement:
-
-### Debug Command
-
-The `/debug` command provides comprehensive system information:
-
-- **Bot Status**: Name, uptime, latency, CTF status, and connections
-- **System Information**: OS details, Python version, memory usage
-- **Database**: Path, size, task count, and query statistics
-- **Network**: Hostname, ping, and processing times
-
-This command is helpful for:
-- Checking if the bot is functioning properly
-- Monitoring performance and resource usage
-- Troubleshooting connectivity issues
-- Verifying database and task status
-
-### Fun Features
-
-The bot includes some fun features to boost team morale:
-
-- **Give Treat**: The `/give_treat` command lets you give the bot a virtual treat
-- The bot responds with different food emojis and cheerful messages
-- This fun interaction helps build team spirit during CTF competitions
-
-## Troubleshooting
-
-### Common Issues
-
-1. **Bot not showing up**: Ensure the bot has proper permissions in Discord
-2. **GitHub errors**: Check your Personal Access Token's scope and expiration date
-3. **Board not updating**: Ensure the BOARD_CHANNEL_ID is correct
-4. **Slash commands not registered**: Check your DEFAULT_GUILD setting
-
-### Logs
-
-The bot keeps detailed logs in:
-- `ctf_task_tracker_bot/logs/bot.log`: General logging
-- `ctf_task_tracker_bot/logs/error.log`: Error-specific logging
+- State lives in a local SQLite file and the bot resets it to a fresh state on every startup (`db.reset_db()`), so it is built to run one CTF at a time on one always-on instance, not as a multi-tenant service.
+- Secrets come only from environment variables; there is no committed token, and the database is created at runtime rather than shipped.
+- GitHub scaffolding assumes a repo whose default branch is `main`, and that the configured token can set the repository private or public.
+- The keep-alive server is there for free hosts that sleep idle processes; on a normal always-on host it is just an unused health endpoint.
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details. 
+MIT. See [LICENSE](LICENSE).
